@@ -1,0 +1,6 @@
+---
+- name: restart_postgres
+  service:
+    name: "{{ postgreSQL_10_vars.platforms[vendor_os].postgres_service }}"
+    state: restarted
+

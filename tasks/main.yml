@@ -1,0 +1,74 @@
+---
+- name: Install Postgres repository
+  package:
+    name: "{{ __repo }}"
+    state: present
+    disable_gpg_check: true
+  loop: "{{ postgreSQL_10_vars.platforms[vendor_os].postgres_repo }}"        
+  loop_control:
+    loop_var: __repo
+
+- name: Install Postgres packages
+  package:
+    name: "{{ __package }}"
+    state: present
+    - "{{ postgreSQL_10_vars.platforms[vendor_os].postgres_packages }}"
+    - "{{ postgreSQL_10_vars.platforms[vendor_os].postgres_library }}"
+  loop_control:
+    loop_var: __package
+
+- name: Check if Postgres initialized
+  stat:
+    path: "{{ postgreSQL_10_vars.platforms[vendor_os].postgres_data_dir }}/PG_VERSION"
+  register: r_postgres_init_dir_state
+
+- when: not r_postgres_init_dir_state.stat.exists
+  name: Run Postgres initdb to initialize if postgres not initialized
+  command: "{{ postgreSQL_10_vars.platforms[vendor_os].postgres_bin_path }}/postgresql-10-setup initdb"
+  notify: restart_postgres
+
+- name: Setup Postgres for remote password auth
+  template:
+    src: pg_hba.conf.j2
+    dest: "{{ postgreSQL_10_vars.platforms[vendor_os].postgres_data_dir }}/pg_hba.conf"
+  notify: restart_postgres
+
+- name: Setup Postgres to listen on network interfaces
+  lineinfile:
+    dest: "{{ postgreSQL_10_vars.platforms[vendor_os].postgres_data_dir }}/postgresql.conf"
+    line: "listen_addresses = '*'"
+    insertafter: "#listen_addresses"
+  notify: restart_postgres
+
+- name: Setup Postgres as started and enabled on boot.
+  service:
+    name: "{{ postgreSQL_10_vars.platforms[vendor_os].postgres_service }}"
+    state: "{{ postgreSQL_10_vars.platforms[vendor_os].postgres_service_state | default('started') }}"
+    enabled: "{{ postgreSQL_10_vars.platforms[vendor_os].postgres_service_enabled | default(true) }}"
+
+- name: Configure Postgres resources, user, database etc 
+  become: true
+  become_user: "{{ postgreSQL_10_vars.postgres_user }}"
+  block:
+    - name: Setup Postgres database(s) 
+      postgresql_db:
+        name: "{{ __database.name }}"
+        login_password: redhat
+        state: "{{ __database.state | default('present') }}"
+      loop: "{{ postgres_databases }}"
+      loop_control:
+        loop_var: __database
+ 
+    - name: Create Postgres user#(s) 
+      postgresql_user:
+        name: "{{ __user.name }}"
+        password: "{{ __user.password | default(omit) }}"
+        encrypted: true 
+        priv: "{{ __user.priv | default(omit) }}"
+        db: "{{ __user.database | default(omit) }}"
+        state: "{{ __user.state | default('present') }}"
+      loop: "{{ postgres_users }}"
+      loop_control:
+        loop_var: __user
+      no_log: "{{ postgres_user_no_log_state | default(false) }}" 
+
