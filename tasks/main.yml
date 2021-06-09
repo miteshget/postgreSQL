@@ -4,7 +4,7 @@
     name: "{{ __repo }}"
     state: present
     disable_gpg_check: true
-  loop: "{{ postgreSQL_10_vars.platforms[vendor_os].postgres_repo }}"        
+  loop: "{{ postgreSQL_10_vars.platforms[vendor_os].postgres_repos }}"
   loop_control:
     loop_var: __repo
 
@@ -12,6 +12,7 @@
   package:
     name: "{{ __package }}"
     state: present
+  loop:
     - "{{ postgreSQL_10_vars.platforms[vendor_os].postgres_packages }}"
     - "{{ postgreSQL_10_vars.platforms[vendor_os].postgres_library }}"
   loop_control:
