@@ -1,5 +1,5 @@
 galaxy_info:
-  role_name: postgreSQL
+  role_name: postgresql
   namespace: gpte_demo
   author: gpte
   description: This role install postgreSQL 10
